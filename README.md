@@ -1,4 +1,4 @@
-![Auto Confirm for ChatGPT](https://lh3.googleusercontent.com/pv8YsNA9p3gHhMmRt5GytcLqDzUAViy646-7KSEmviZy3scdtamReKG4UG-QolmtxuSLMM99kTupCvBjgpoILjF2=s1280-w1280-h800)
+![Auto Confirm for ChatGPT](assets/screenshot.png)
 
 # Auto Confirm for ChatGPT
 

@@ -15,13 +15,13 @@ const CONFIG = {
         SECONDARY: '.btn-secondary',
         TEXT_WRAPPER: 'div:not([class*="icon"]):not([class*="sprite"]), span:not([class*="icon"])'
     },
-    EXCLUDE_WORDS: ['cancel','отмена','annulliere','cerrar','fermer','annuler','annulla','anular','deny','отклонить','отказ'],
+    EXCLUDE_WORDS: ['cancel','отмена','annulliere','cerrar','fermer','annuler','annulla','anular','deny','отклонить','отказ','отказаться','запретить','reject','refuse','decline','disallow','block','блокировать','later','not now','拒绝','拒否','거부'],
     CONFIRM_WORDS: [
         'confirm','podtverdit','potvrdi','confirma','potvrdit','bekræft','bestätigen','confirmer',
         'kinnita','vahvista','megerősít','konfirmi','staðfesta','confermare','patvirtinti',
         'apstiprināt','bekreft','bevestigen','potwierdź','confirmar','confirmă','potvrdiť',
         'potrdi','xaqiiji','konfirmo','bekräfta','thibitisha','kumpirmahin','onayla',
-        'xác nhận','sahkan','mengesahkan','подтвердить','потвърди','потврди','підтвердити',
+        'xác nhận','sahkan','mengesahkan','подтвердить','потвърди','потврди','підтвердити','разрешить','разрешить один раз',
         'επιβεβαιώστε','تأكيد','يؤكد','تایید','تصدیق کریں','নিশ্চিত করুন','પુષ્ટિ કરો',
         'पुष्टि करें','પુષ્ટિ કરો','ਪੁਸ਼ਟੀ ਕਰੋ','ಸ್ಥಿರೀಕರಿಸಿ','ಸ್ಥിരീകരിക്കുക','స్థిరీకರించು',
         'உறுதிப்படுத்து','အတည်ပြုပါ','ยืนยัน','确认','確認','확인','დაადასტურეთ',
@@ -67,7 +67,31 @@ function isButtonValid(btn) {
            !btn.closest('[aria-hidden="true"], [hidden]') && btn.checkVisibility?.() !== false;
 }
 
+function findSiblingConfirmButton() {
+    const containerSelectors = '[role="dialog"], [data-radix-dialog-content], .mb-2.flex.items-center.gap-2';
+    const groups = new Set(document.querySelectorAll(containerSelectors));
+    if (groups.size === 0) return null;
+
+    for (const group of groups) {
+        const buttons = Array.from(group.querySelectorAll('button, [role="button"]')).filter(isButtonValid);
+        if (buttons.length < 2) continue;
+
+        const denyCount = buttons.reduce((n, btn) => n + (isExcluded(extractButtonText(btn)) ? 1 : 0), 0);
+        if (denyCount !== 1) continue;
+
+        const confirmBtn = buttons.find(btn => !isExcluded(extractButtonText(btn)));
+        if (confirmBtn) {
+            log('✅ Found via SIBLING_DENY:', extractButtonText(confirmBtn));
+            return confirmBtn;
+        }
+    }
+    return null;
+}
+
 function findConfirmButton() {
+    const siblingBtn = findSiblingConfirmButton();
+    if (siblingBtn) return siblingBtn;
+
     const candidates = document.querySelectorAll(CONFIG.SELECTORS.PRIMARY);
     for (const btn of candidates) {
         const text = extractButtonText(btn);

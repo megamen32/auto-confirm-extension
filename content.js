@@ -143,15 +143,89 @@ function isContextAlive() {
     try { return !!chrome?.runtime?.id; } catch { return false; }
 }
 
+let pendingClick = null;
+
+function startCountdown(btn) {
+    cancelPendingClick();
+
+    const orig = { outline: btn.style.outline, boxShadow: btn.style.boxShadow };
+    btn.style.outline = '3px solid #10a37f';
+    btn.style.outlineOffset = '2px';
+    btn.style.boxShadow = '0 0 0 4px rgba(16, 163, 127, 0.3)';
+
+    const overlay = document.createElement('div');
+    overlay.style.cssText = [
+        'position:fixed', 'background:#10a37f', 'color:#fff',
+        'font:600 16px system-ui,sans-serif', 'padding:4px 12px',
+        'border-radius:8px', 'z-index:2147483647', 'pointer-events:none',
+        'box-shadow:0 4px 12px rgba(0,0,0,0.4)', 'transform:translateX(-50%)',
+        'transition:opacity .15s ease,background .15s ease'
+    ].join(';');
+    overlay.textContent = '3';
+
+    const place = () => {
+        const r = btn.getBoundingClientRect();
+        overlay.style.left = (r.left + r.width / 2) + 'px';
+        overlay.style.top = (r.top - 36) + 'px';
+    };
+    place();
+    document.body.appendChild(overlay);
+
+    let count = 3;
+    const interval = setInterval(() => {
+        count--;
+        if (count > 0) {
+            overlay.textContent = String(count);
+            place();
+        } else {
+            clearInterval(interval);
+            overlay.remove();
+            btn.style.outline = orig.outline;
+            btn.style.boxShadow = orig.boxShadow;
+            pendingClick = null;
+            log('🎯 Clicking after countdown:', extractButtonText(btn));
+            btn.click();
+        }
+    }, 1000);
+
+    pendingClick = {
+        btn,
+        interval,
+        cancel: () => {
+            clearInterval(interval);
+            overlay.textContent = '✕';
+            overlay.style.background = '#e53e3e';
+            setTimeout(() => {
+                overlay.remove();
+                btn.style.outline = orig.outline;
+                btn.style.boxShadow = orig.boxShadow;
+            }, 250);
+            pendingClick = null;
+            log('⛔ Countdown cancelled');
+        }
+    };
+}
+
+function cancelPendingClick() {
+    if (pendingClick) pendingClick.cancel();
+}
+
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && pendingClick) {
+        e.preventDefault();
+        cancelPendingClick();
+    }
+});
+
 function checkAndClickButton() {
-    if (!isContextAlive()) return;
+    if (!isContextAlive() || pendingClick) return;
     try {
         chrome.runtime.sendMessage({ action: 'isTabActive' }, (response) => {
             if (chrome.runtime.lastError || !response?.active) return;
             const confirmBtn = findConfirmButton();
             if (confirmBtn) {
-                log('🎯 Clicking:', extractButtonText(confirmBtn));
-                confirmBtn.click();
+                log('⏱ Starting countdown for:', extractButtonText(confirmBtn));
+                startCountdown(confirmBtn);
                 return true;
             }
             return false;

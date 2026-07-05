@@ -272,8 +272,27 @@ function expandByLabel(regex) {
     candidates.forEach((container) => clickExpandableElements(container));
 }
 
+const clickedExpandButtons = new WeakSet();
+
+function expandByClass(selector, label) {
+    const containers = document.querySelectorAll(selector);
+    let count = 0;
+    containers.forEach((container) => {
+        const btn = container.querySelector('button');
+        if (btn && isButtonValid(btn) && !clickedExpandButtons.has(btn)) {
+            clickedExpandButtons.add(btn);
+            btn.click();
+            count++;
+        }
+    });
+    if (count) log(`🔓 Clicked ${count} ${label} expand button(s)`);
+}
+
 function expandAllIfNeeded() {
-    if (STATE.autoExpandToolCalls) expandByLabel(CONFIG.EXPAND_LABELS.TOOL_CALL);
+    if (STATE.autoExpandToolCalls) {
+        expandByClass('[class*="tool-message"], [class*="group/tool-message"]', 'tool-message');
+        expandByLabel(CONFIG.EXPAND_LABELS.TOOL_CALL);
+    }
     if (STATE.autoExpandInputs) expandByLabel(CONFIG.EXPAND_LABELS.INPUTS);
     if (STATE.autoExpandOutputs) expandByLabel(CONFIG.EXPAND_LABELS.OUTPUTS);
 }

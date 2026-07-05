@@ -288,13 +288,30 @@ function expandByClass(selector, label) {
     if (count) log(`🔓 Clicked ${count} ${label} expand button(s)`);
 }
 
+function expandCollapsedCarets() {
+    const carets = document.querySelectorAll('svg.transition-transform.rotate-90');
+    let count = 0;
+    carets.forEach((svg) => {
+        const btn = svg.closest('button');
+        if (btn && isButtonValid(btn) && !clickedExpandButtons.has(btn)) {
+            clickedExpandButtons.add(btn);
+            btn.click();
+            count++;
+        }
+    });
+    if (count) log(`🔓 Clicked ${count} collapsed input/output caret(s)`);
+}
+
 function expandAllIfNeeded() {
     if (STATE.autoExpandToolCalls) {
         expandByClass('[class*="tool-message"], [class*="group/tool-message"]', 'tool-message');
         expandByLabel(CONFIG.EXPAND_LABELS.TOOL_CALL);
     }
-    if (STATE.autoExpandInputs) expandByLabel(CONFIG.EXPAND_LABELS.INPUTS);
-    if (STATE.autoExpandOutputs) expandByLabel(CONFIG.EXPAND_LABELS.OUTPUTS);
+    if (STATE.autoExpandInputs || STATE.autoExpandOutputs) {
+        expandCollapsedCarets();
+        expandByLabel(CONFIG.EXPAND_LABELS.INPUTS);
+        expandByLabel(CONFIG.EXPAND_LABELS.OUTPUTS);
+    }
 }
 
 let intervalId = null;

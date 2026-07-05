@@ -139,17 +139,26 @@ function findConfirmButton() {
     return null;
 }
 
+function isContextAlive() {
+    try { return !!chrome?.runtime?.id; } catch { return false; }
+}
+
 function checkAndClickButton() {
-    chrome.runtime.sendMessage({ action: 'isTabActive' }, (response) => {
-        if (chrome.runtime.lastError || !response?.active) return;
-        const confirmBtn = findConfirmButton();
-        if (confirmBtn) {
-            log('🎯 Clicking:', extractButtonText(confirmBtn));
-            confirmBtn.click();
-            return true;
-        }
-        return false;
-    });
+    if (!isContextAlive()) return;
+    try {
+        chrome.runtime.sendMessage({ action: 'isTabActive' }, (response) => {
+            if (chrome.runtime.lastError || !response?.active) return;
+            const confirmBtn = findConfirmButton();
+            if (confirmBtn) {
+                log('🎯 Clicking:', extractButtonText(confirmBtn));
+                confirmBtn.click();
+                return true;
+            }
+            return false;
+        });
+    } catch (e) {
+        log('⚠️ sendMessage failed:', String(e));
+    }
 }
 
 function buttonLooksExpandable(btn) {
@@ -249,21 +258,31 @@ function setupObserver() {
 
 function init() {
     document.addEventListener('visibilitychange', handleVisibilityChange);
-    chrome.storage.local.get(Object.values(CONFIG.STORAGE_KEYS), (result) => {
-        updateAutoConfirmState(result[CONFIG.STORAGE_KEYS.AUTO_CONFIRM] || false);
-        updateExpandState('autoExpandToolCalls', result[CONFIG.STORAGE_KEYS.AUTO_EXPAND_TOOL_CALLS] || false);
-        updateExpandState('autoExpandInputs', result[CONFIG.STORAGE_KEYS.AUTO_EXPAND_INPUTS] || false);
-        updateExpandState('autoExpandOutputs', result[CONFIG.STORAGE_KEYS.AUTO_EXPAND_OUTPUTS] || false);
-        log('🚀 Initial state:', STATE);
-        expandAllIfNeeded();
-    });
-    chrome.storage.onChanged.addListener((changes, namespace) => {
-        if (namespace !== 'local') return;
-        if (changes[CONFIG.STORAGE_KEYS.AUTO_CONFIRM]) updateAutoConfirmState(changes[CONFIG.STORAGE_KEYS.AUTO_CONFIRM].newValue);
-        if (changes[CONFIG.STORAGE_KEYS.AUTO_EXPAND_TOOL_CALLS]) updateExpandState('autoExpandToolCalls', changes[CONFIG.STORAGE_KEYS.AUTO_EXPAND_TOOL_CALLS].newValue);
-        if (changes[CONFIG.STORAGE_KEYS.AUTO_EXPAND_INPUTS]) updateExpandState('autoExpandInputs', changes[CONFIG.STORAGE_KEYS.AUTO_EXPAND_INPUTS].newValue);
-        if (changes[CONFIG.STORAGE_KEYS.AUTO_EXPAND_OUTPUTS]) updateExpandState('autoExpandOutputs', changes[CONFIG.STORAGE_KEYS.AUTO_EXPAND_OUTPUTS].newValue);
-    });
+    if (!isContextAlive()) {
+        log('⚠️ Extension context not available, skipping init');
+        return;
+    }
+    try {
+        chrome.storage.local.get(Object.values(CONFIG.STORAGE_KEYS), (result) => {
+            if (chrome.runtime.lastError) return;
+            updateAutoConfirmState(result[CONFIG.STORAGE_KEYS.AUTO_CONFIRM] || false);
+            updateExpandState('autoExpandToolCalls', result[CONFIG.STORAGE_KEYS.AUTO_EXPAND_TOOL_CALLS] || false);
+            updateExpandState('autoExpandInputs', result[CONFIG.STORAGE_KEYS.AUTO_EXPAND_INPUTS] || false);
+            updateExpandState('autoExpandOutputs', result[CONFIG.STORAGE_KEYS.AUTO_EXPAND_OUTPUTS] || false);
+            log('🚀 Initial state:', STATE);
+            expandAllIfNeeded();
+        });
+        chrome.storage.onChanged.addListener((changes, namespace) => {
+            if (chrome.runtime.lastError) return;
+            if (namespace !== 'local') return;
+            if (changes[CONFIG.STORAGE_KEYS.AUTO_CONFIRM]) updateAutoConfirmState(changes[CONFIG.STORAGE_KEYS.AUTO_CONFIRM].newValue);
+            if (changes[CONFIG.STORAGE_KEYS.AUTO_EXPAND_TOOL_CALLS]) updateExpandState('autoExpandToolCalls', changes[CONFIG.STORAGE_KEYS.AUTO_EXPAND_TOOL_CALLS].newValue);
+            if (changes[CONFIG.STORAGE_KEYS.AUTO_EXPAND_INPUTS]) updateExpandState('autoExpandInputs', changes[CONFIG.STORAGE_KEYS.AUTO_EXPAND_INPUTS].newValue);
+            if (changes[CONFIG.STORAGE_KEYS.AUTO_EXPAND_OUTPUTS]) updateExpandState('autoExpandOutputs', changes[CONFIG.STORAGE_KEYS.AUTO_EXPAND_OUTPUTS].newValue);
+        });
+    } catch (e) {
+        log('⚠️ Init failed:', String(e));
+    }
     setupObserver();
     log('✅ AutoConfirm initialized');
 }

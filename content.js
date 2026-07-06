@@ -2,7 +2,6 @@
 const CONFIG = {
     DEBUG: false,
     CHECK_INTERVAL: 300,
-    EXPAND_POLL_INTERVAL: 10000,
     STORAGE_KEYS: {
         AUTO_CONFIRM: 'autoConfirmEnabled',
         AUTO_EXPAND_TOOL_CALLS: 'autoExpandToolCalls',
@@ -395,14 +394,6 @@ function init() {
         log('⚠️ Init failed:', String(e));
     }
     setupObserver();
-
-    setInterval(() => {
-        if (STATE.autoExpandToolCalls || STATE.autoExpandInputs || STATE.autoExpandOutputs) {
-            expandAllIfNeeded();
-        }
-    }, CONFIG.EXPAND_POLL_INTERVAL);
-    log('⏱ Expand polling started (every ' + (CONFIG.EXPAND_POLL_INTERVAL / 1000) + 's)');
-
     log('✅ AutoConfirm initialized');
 }
 

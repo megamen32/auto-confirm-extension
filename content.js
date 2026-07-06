@@ -165,11 +165,41 @@ function startCountdown(btn) {
 
     const place = () => {
         const r = btn.getBoundingClientRect();
-        overlay.style.left = (r.left + r.width / 2) + 'px';
-        overlay.style.top = (r.top - 36) + 'px';
+        const vw = window.innerWidth;
+        const vh = window.innerHeight;
+        const margin = 12;
+        const ow = overlay.offsetWidth || 40;
+        const oh = overlay.offsetHeight || 28;
+
+        let x = r.left + r.width / 2;
+        let y = r.top - oh - 8;
+
+        if (r.top < 0) {
+            y = margin;
+        } else if (r.bottom > vh) {
+            y = vh - oh - margin;
+        } else {
+            y = Math.max(margin, Math.min(vh - oh - margin, y));
+        }
+
+        x = Math.max(ow / 2 + margin, Math.min(vw - ow / 2 - margin, x));
+
+        overlay.style.left = x + 'px';
+        overlay.style.top = y + 'px';
     };
     place();
     document.body.appendChild(overlay);
+
+    window.addEventListener('scroll', place, { passive: true, capture: true });
+    window.addEventListener('resize', place);
+
+    const cleanup = () => {
+        clearInterval(interval);
+        window.removeEventListener('scroll', place, { capture: true });
+        window.removeEventListener('resize', place);
+        btn.style.outline = orig.outline;
+        btn.style.boxShadow = orig.boxShadow;
+    };
 
     let count = 3;
     const interval = setInterval(() => {
@@ -178,10 +208,8 @@ function startCountdown(btn) {
             overlay.textContent = String(count);
             place();
         } else {
-            clearInterval(interval);
+            cleanup();
             overlay.remove();
-            btn.style.outline = orig.outline;
-            btn.style.boxShadow = orig.boxShadow;
             pendingClick = null;
             log('🎯 Clicking after countdown:', extractButtonText(btn));
             btn.click();
@@ -193,6 +221,8 @@ function startCountdown(btn) {
         interval,
         cancel: () => {
             clearInterval(interval);
+            window.removeEventListener('scroll', place, { capture: true });
+            window.removeEventListener('resize', place);
             overlay.textContent = '✕';
             overlay.style.background = '#e53e3e';
             setTimeout(() => {

@@ -2,7 +2,7 @@
     "update_url": "https://clients2.google.com/service/update2/crx",
     "manifest_version": 3,
     "name": "Auto-confirm for ChatGPT Actions",
-    "version": "1.5.0",
+    "version": "1.5.1",
     "description": "Automatically clicks the Confirm button on Actions in Custom GPTs in ChatGPT. Works with 60+ languages.",
     "permissions": ["storage", "tabs"],
     "host_permissions": [

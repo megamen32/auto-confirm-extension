@@ -219,19 +219,10 @@ document.addEventListener('keydown', (e) => {
 
 function checkAndClickButton() {
     if (!isContextAlive() || pendingClick) return;
-    try {
-        chrome.runtime.sendMessage({ action: 'isTabActive' }, (response) => {
-            if (chrome.runtime.lastError || !response?.active) return;
-            const confirmBtn = findConfirmButton();
-            if (confirmBtn) {
-                log('⏱ Starting countdown for:', extractButtonText(confirmBtn));
-                startCountdown(confirmBtn);
-                return true;
-            }
-            return false;
-        });
-    } catch (e) {
-        log('⚠️ sendMessage failed:', String(e));
+    const confirmBtn = findConfirmButton();
+    if (confirmBtn) {
+        log('⏱ Starting countdown for:', extractButtonText(confirmBtn));
+        startCountdown(confirmBtn);
     }
 }
 

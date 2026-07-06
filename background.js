@@ -13,7 +13,6 @@ function getActiveTabId(callback) { chrome.tabs.query({ active: true, currentWin
 function setDefault(key, defaultValue) { chrome.storage.local.get(key, (result) => { if (result[key] === undefined) chrome.storage.local.set({ [key]: defaultValue }); }); }
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     log('📨 Message:', message);
-    if (message.action === 'isTabActive') { getActiveTabId((activeTabId) => { sendResponse({ active: activeTabId === sender.tab?.id }); }); return true; }
     if (message.action === 'toggleAutoConfirm') {
         const newValue = message.isEnabled;
         chrome.storage.local.set({ [CONFIG.STORAGE_KEYS.AUTO_CONFIRM]: newValue }, () => {

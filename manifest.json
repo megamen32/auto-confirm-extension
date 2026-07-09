@@ -2,22 +2,37 @@
     "update_url": "https://clients2.google.com/service/update2/crx",
     "manifest_version": 3,
     "name": "Auto-confirm for ChatGPT Actions",
-    "version": "1.6.0",
+    "version": "1.7.0",
     "description": "Automatically clicks the Confirm button on Actions in Custom GPTs in ChatGPT. Works with 60+ languages.",
-    "permissions": ["storage", "tabs"],
+    "permissions": [
+        "storage",
+        "tabs",
+        "debugger"
+    ],
     "host_permissions": [
         "https://chat.openai.com/*",
         "https://chatgpt.com/*"
     ],
-    "background": { "service_worker": "background.js" },
-    "content_scripts": [{
-        "matches": ["https://chat.openai.com/*", "https://chatgpt.com/*"],
-        "js": ["content.js"],
-        "run_at": "document_idle"
-    }],
+    "background": {
+        "service_worker": "background.js"
+    },
+    "content_scripts": [
+        {
+            "matches": [
+                "https://chat.openai.com/*",
+                "https://chatgpt.com/*"
+            ],
+            "js": [
+                "content.js"
+            ],
+            "run_at": "document_idle"
+        }
+    ],
     "action": {
         "default_icon": "icon_off.png",
         "default_popup": "popup.html"
     },
-    "icons": { "128": "icon_off.png" }
+    "icons": {
+        "128": "icon_off.png"
+    }
 }

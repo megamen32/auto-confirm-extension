@@ -1,5 +1,7 @@
 const SETTINGS = {
   toggleAutoConfirm: 'autoConfirmEnabled',
+  toggleBackgroundClicks: 'backgroundClicksEnabled',
+  toggleTabTitleChanges: 'tabTitleChangesEnabled',
   toggleExpandToolCalls: 'autoExpandToolCalls',
   toggleExpandInputs: 'autoExpandInputs',
   toggleExpandOutputs: 'autoExpandOutputs'

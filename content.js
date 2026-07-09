@@ -6,7 +6,9 @@ const CONFIG = {
         AUTO_CONFIRM: 'autoConfirmEnabled',
         AUTO_EXPAND_TOOL_CALLS: 'autoExpandToolCalls',
         AUTO_EXPAND_INPUTS: 'autoExpandInputs',
-        AUTO_EXPAND_OUTPUTS: 'autoExpandOutputs'
+        AUTO_EXPAND_OUTPUTS: 'autoExpandOutputs',
+        BACKGROUND_CLICKS: 'backgroundClicksEnabled',
+        TAB_TITLE_CHANGES: 'tabTitleChangesEnabled'
     },
     SELECTORS: {
         PRIMARY: 'button.btn-primary',
@@ -38,7 +40,9 @@ const STATE = {
     autoConfirm: false,
     autoExpandToolCalls: false,
     autoExpandInputs: false,
-    autoExpandOutputs: false
+    autoExpandOutputs: false,
+    backgroundClicks: false,
+    tabTitleChanges: false
 };
 
 const log = (...args) => CONFIG.DEBUG && console.log('🔍 [AutoConfirm]', ...args);
@@ -144,6 +148,61 @@ function isContextAlive() {
 }
 
 let pendingClick = null;
+let originalTitle = document.title;
+let titleRestoreTimer = null;
+let lastBackgroundClickAt = 0;
+
+function setAutoConfirmTitle(label) {
+    if (!STATE.tabTitleChanges) return;
+    if (!originalTitle || !document.title.startsWith('[AC')) originalTitle = document.title;
+    if (titleRestoreTimer) clearTimeout(titleRestoreTimer);
+    document.title = `[AC ${label}] ${originalTitle.replace(/^\[AC[^\]]*\]\s*/, '')}`;
+}
+
+function restoreAutoConfirmTitleSoon(delay = 800, force = false) {
+    if (!STATE.tabTitleChanges && !force) return;
+    if (titleRestoreTimer) clearTimeout(titleRestoreTimer);
+    titleRestoreTimer = setTimeout(() => {
+        document.title = originalTitle.replace(/^\[AC[^\]]*\]\s*/, '');
+        titleRestoreTimer = null;
+    }, delay);
+}
+
+function getClickPoint(btn) {
+    const r = btn.getBoundingClientRect();
+    return {
+        x: Math.max(1, Math.min(window.innerWidth - 1, r.left + r.width / 2)),
+        y: Math.max(1, Math.min(window.innerHeight - 1, r.top + r.height / 2))
+    };
+}
+
+function requestBackgroundClick(btn) {
+    const now = Date.now();
+    if (now - lastBackgroundClickAt < 1500) return;
+    lastBackgroundClickAt = now;
+
+    const { x, y } = getClickPoint(btn);
+    chrome.runtime.sendMessage({ action: 'backgroundClick', x, y }, (response) => {
+        if (chrome.runtime.lastError) {
+            log('⚠️ Background click failed:', chrome.runtime.lastError.message);
+            return;
+        }
+        if (!response?.ok) {
+            log('⚠️ Background click rejected:', response?.error || 'unknown error');
+        } else {
+            log('🎯 Background click sent via CDP:', x, y);
+        }
+    });
+}
+
+function performConfirmClick(btn) {
+    if (STATE.backgroundClicks) {
+        requestBackgroundClick(btn);
+    } else {
+        btn.click();
+    }
+}
+
 
 function startCountdown(btn) {
     cancelPendingClick();
@@ -162,6 +221,7 @@ function startCountdown(btn) {
         'transition:opacity .15s ease,background .15s ease'
     ].join(';');
     overlay.textContent = '3';
+    setAutoConfirmTitle('3');
 
     const place = () => {
         const r = btn.getBoundingClientRect();
@@ -206,13 +266,16 @@ function startCountdown(btn) {
         count--;
         if (count > 0) {
             overlay.textContent = String(count);
+            setAutoConfirmTitle(String(count));
             place();
         } else {
             cleanup();
             overlay.remove();
             pendingClick = null;
             log('🎯 Clicking after countdown:', extractButtonText(btn));
-            btn.click();
+            setAutoConfirmTitle('click');
+            performConfirmClick(btn);
+            restoreAutoConfirmTitleSoon();
         }
     }, 1000);
 
@@ -231,6 +294,7 @@ function startCountdown(btn) {
                 btn.style.boxShadow = orig.boxShadow;
             }, 250);
             pendingClick = null;
+            restoreAutoConfirmTitleSoon(250);
             log('⛔ Countdown cancelled');
         }
     };
@@ -357,13 +421,25 @@ function updateAutoConfirmState(isEnabled) {
 function updateExpandState(key, value) {
     STATE[key] = !!value;
     log('🔄 Expand state changed:', key, STATE[key]);
-    if (STATE[key] && isVisible) expandAllIfNeeded();
+    if (STATE[key] && (isVisible || STATE.backgroundClicks)) expandAllIfNeeded();
+}
+
+function updateBackgroundClickState(value) {
+    STATE.backgroundClicks = !!value;
+    log('🔄 Background clicks state:', STATE.backgroundClicks);
+    if (STATE.backgroundClicks && STATE.autoConfirm) checkAndClickButton();
+}
+
+function updateTitleChangeState(value) {
+    STATE.tabTitleChanges = !!value;
+    log('🔄 Tab title changes state:', STATE.tabTitleChanges);
+    if (!STATE.tabTitleChanges) restoreAutoConfirmTitleSoon(0, true);
 }
 
 function handleVisibilityChange() {
     isVisible = document.visibilityState === 'visible';
     log('👁 Visibility:', isVisible ? 'visible' : 'hidden');
-    if (isVisible) {
+    if (isVisible || STATE.backgroundClicks) {
         if (STATE.autoConfirm) checkAndClickButton();
         if (STATE.autoExpandToolCalls || STATE.autoExpandInputs || STATE.autoExpandOutputs) expandAllIfNeeded();
     }
@@ -374,7 +450,7 @@ let observer = null;
 function setupObserver() {
     if (observer) observer.disconnect();
     observer = new MutationObserver(() => {
-        if (!isVisible) return;
+        if (!isVisible && !STATE.backgroundClicks) return;
         if (STATE.autoConfirm) {
             const hasDialog = document.querySelector(CONFIG.SELECTORS.DIALOG) || document.querySelector(CONFIG.SELECTORS.BUTTON_GROUP);
             if (hasDialog) checkAndClickButton();
@@ -400,6 +476,8 @@ function init() {
             updateExpandState('autoExpandToolCalls', result[CONFIG.STORAGE_KEYS.AUTO_EXPAND_TOOL_CALLS] || false);
             updateExpandState('autoExpandInputs', result[CONFIG.STORAGE_KEYS.AUTO_EXPAND_INPUTS] || false);
             updateExpandState('autoExpandOutputs', result[CONFIG.STORAGE_KEYS.AUTO_EXPAND_OUTPUTS] || false);
+            updateBackgroundClickState(result[CONFIG.STORAGE_KEYS.BACKGROUND_CLICKS] || false);
+            updateTitleChangeState(result[CONFIG.STORAGE_KEYS.TAB_TITLE_CHANGES] || false);
             log('🚀 Initial state:', STATE);
             expandAllIfNeeded();
         });
@@ -410,6 +488,8 @@ function init() {
             if (changes[CONFIG.STORAGE_KEYS.AUTO_EXPAND_TOOL_CALLS]) updateExpandState('autoExpandToolCalls', changes[CONFIG.STORAGE_KEYS.AUTO_EXPAND_TOOL_CALLS].newValue);
             if (changes[CONFIG.STORAGE_KEYS.AUTO_EXPAND_INPUTS]) updateExpandState('autoExpandInputs', changes[CONFIG.STORAGE_KEYS.AUTO_EXPAND_INPUTS].newValue);
             if (changes[CONFIG.STORAGE_KEYS.AUTO_EXPAND_OUTPUTS]) updateExpandState('autoExpandOutputs', changes[CONFIG.STORAGE_KEYS.AUTO_EXPAND_OUTPUTS].newValue);
+            if (changes[CONFIG.STORAGE_KEYS.BACKGROUND_CLICKS]) updateBackgroundClickState(changes[CONFIG.STORAGE_KEYS.BACKGROUND_CLICKS].newValue);
+            if (changes[CONFIG.STORAGE_KEYS.TAB_TITLE_CHANGES]) updateTitleChangeState(changes[CONFIG.STORAGE_KEYS.TAB_TITLE_CHANGES].newValue);
         });
     } catch (e) {
         log('⚠️ Init failed:', String(e));
